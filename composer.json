@@ -1,0 +1,26 @@
+{
+    "name": "sujun/auth",
+    "description": "auth package for thinkphp5",
+    "homepage": "http://www.yikaipu.com",
+    "license": "Apache-2.0",
+    "minimum-stability": "stable",
+    "version": "v1.0.0",
+    "authors": [
+         {
+            "name":"sujun",
+            "email":"351699382@qq.com",
+            "homepage":"http://www.yishuoshe.com"
+         }
+    ],
+    "support": {
+        "issues": "http://www.yikaipu.com"
+    },
+    "require": {
+        "php": ">=5.4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Auth\\": "src/"
+        }
+    }
+}
