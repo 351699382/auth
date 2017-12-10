@@ -243,6 +243,9 @@ class Auth
         } else {
             $this->config['public_auth'] = [$this->config['public_auth']];
         }
+        array_walk($this->config['public_auth'], function (&$v) {
+            $v = strtolower($v);
+        });
         $authList = $this->config['public_auth'];
 
         foreach ($rules as $rule) {
