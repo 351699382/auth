@@ -86,13 +86,13 @@ class Custom extends Db
         }
 
         $ids = implode(',', $ids);
-        $sql = "SELECT `condition`,`name`,`type`,`request_method` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 0 ";
+        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 0 ";
 
         $stmt = $this->db->query($sql);
         $userRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
         //获取公开的规则，is_public：1
-        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method` FROM {$this->config['auth_rule']}  WHERE is_public=1 AND status= 0 ";
+        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid` FROM {$this->config['auth_rule']}  WHERE is_public=1 AND status= 0 ";
         $stmt = $this->db->query($sql);
         $publicRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
