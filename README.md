@@ -1,21 +1,31 @@
 # auth
 这是一个方便集成于任何PHP后台系统的auth权限控制系统
+v2.0.0版本加入请求头类型判断，解决有些REST风格的api。加入机构字段，有些需求是机构后台，每个机构有不同的管理权限。
 
 ## 安装
-> composer require "sujun/auth": "v1.0.0"
+> composer require "sujun/auth": "v2.0.0"
 
 ## 配置
 ### 公共配置
 ```
 // auth配置
-'auth'  => [
+'auth' => [
     'auth_on'           => 1, // 权限开关
-    'auth_type'         => 1, // 认证方式，1为实时认证；2为登录认证。
-    'auth_group'        => 'auth_group', // 用户组数据不带前缀表名
-    'auth_group_access' => 'auth_group_access', // 用户-用户组关系不带前缀表名
-    'public_auth'       =>'' //忽略的验证规则
-    'auth_rule'         => 'auth_rule', // 权限规则不带前缀表名
-    'auth_user'         => 'admin', // 用户信息不带前缀表名
+    'auth_type'         => 2, // 认证方式，1为实时认证；2为登录认证。
+    'public_auth'       => [
+       [
+           'name'=>'admin/v1.Auth/getUserAccessLists',
+           'method'=>'post'
+       ],
+       [
+           'name'=>'api/admin/info',
+           'method'=>'get'
+       ],
+    ],
+    'auth_group'        => 'auth_group', // 用户组数据表名
+    'auth_group_access' => 'auth_group_access', // 用户-用户组关系表
+    'auth_rule'         => 'auth_rule', // 权限规则表
+    'auth_user'         => 'auth_admin', // 用户信息表
 ],
 ```
 
@@ -25,31 +35,43 @@
 ```
 -- ----------------------------
 -- auth_rule，规则表，
--- id:主键，name：规则唯一标识, title：规则中文名称 status 状态：为1正常，为0禁用，condition：规则表达式，为空表示存在就验证，不为空表示按照条件验证
+-- id:主键，name：规则唯一标识, title：规则中文名称 status 状态：为0正常，为1禁用，condition：规则表达式，为空表示存在就验证，不为空表示按照条件验证
 -- ----------------------------
 DROP TABLE IF EXISTS `auth_rule`;
 CREATE TABLE `auth_rule` (
-    `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-    `name` char(80) NOT NULL DEFAULT '',
-    `title` char(20) NOT NULL DEFAULT '',
-    `type` tinyint(1) NOT NULL DEFAULT '1',
-    `status` tinyint(1) NOT NULL DEFAULT '1',
-    `condition` char(100) NOT NULL DEFAULT '',  # 规则附件条件,满足附加条件的规则,才认为是有效的规则
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `name` (`name`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
+  `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
+  `open_oid` int(11) DEFAULT '0' COMMENT '对某些类型机构开放：暂定0表示所有都开放',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '规则唯一标识',
+  `request_method` varchar(255) NOT NULL DEFAULT '' COMMENT '请求方法',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '规则中文名称',
+  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '规则类型，1为需要用户信息',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态：为0正常，为1禁用',
+  `is_show` tinyint(1) DEFAULT '0' COMMENT '是否显示:0显示，1不显示',
+  `is_public` tinyint(1) DEFAULT '0' COMMENT '是否是开放的权限，用于判断新增或更改都开放情况：0否，1是',
+  `condition` text NOT NULL COMMENT '规则表达式，为空表示存在就验证，不为空表示按照条件验证# 规则附件条件,满足附加条件的规则,才认为是有效的规则',
+  `pid` mediumint(8) unsigned NOT NULL COMMENT '用户把规则划分成组，方便分配权限',
+  `update_time` datetime DEFAULT NULL,
+  `create_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='规则表';
 -- ----------------------------
 -- auth_group 用户组表，
--- id：主键， title:用户组中文名称， rules：用户组拥有的规则id， 多个规则","隔开，status 状态：为1正常，为0禁用
+-- id：主键， title:用户组中文名称， rules：用户组拥有的规则id， 多个规则","隔开，status 状态：为0正常，为1禁用
 -- ----------------------------
 DROP TABLE IF EXISTS `auth_group`;
-    CREATE TABLE `auth_group` (
-    `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-    `title` char(100) NOT NULL DEFAULT '',
-    `status` tinyint(1) NOT NULL DEFAULT '1',
-    `rules` char(80) NOT NULL DEFAULT '',
-    PRIMARY KEY (`id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
+CREATE TABLE `auth_group` (
+  `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
+  `oid` int(11) DEFAULT NULL,
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '用户组中文名称',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态：为0正常，为1禁用',
+  `rules` text COMMENT '用户组拥有的规则id，多个规则","隔开',
+  `is_del` tinyint(1) DEFAULT '0' COMMENT '删除状态：0正常，1删除',
+  `update_time` datetime DEFAULT NULL,
+  `create_time` datetime DEFAULT NULL,
+  `remarks` text  DEFAULT '' COMMENT '备注',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户组表';
 -- ----------------------------
 -- auth_group_access 用户组明细表
 -- uid:用户id，group_id：用户组id

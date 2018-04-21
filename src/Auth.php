@@ -36,29 +36,39 @@ use Auth\Custom;
 -- ----------------------------
 DROP TABLE IF EXISTS `auth_rule`;
 CREATE TABLE `auth_rule` (
-`id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-`name` varchar(255) NOT NULL DEFAULT '' COMMENT '规则唯一标识',
-`title` varchar(255) NOT NULL DEFAULT '' COMMENT '规则中文名称',
-`type` tinyint(1) NOT NULL DEFAULT '1' COMMENT '1:正则验证规则',
-`status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态：为1正常，为0禁用',
-`condition` text NOT NULL DEFAULT '' COMMENT '规则表达式，为空表示存在就验证，不为空表示按照条件验证',  # 规则附件条件,满足附加条件的规则,才认为是有效的规则
-`pid` mediumint(8) unsigned NOT NULL COMMENT '用户把规则划分成组，方便分配权限',
-PRIMARY KEY (`id`),
-UNIQUE KEY `name` (`name`)
-) ENGINE=InnoDB  AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='规则表';
+  `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
+  `open_oid` int(11) DEFAULT '0' COMMENT '对某些类型机构开放：暂定0表示所有都开放',
+  `name` varchar(255) NOT NULL DEFAULT '' COMMENT '规则唯一标识',
+  `request_method` varchar(255) NOT NULL DEFAULT '' COMMENT '请求方法',
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '规则中文名称',
+  `type` tinyint(1) NOT NULL DEFAULT '0' COMMENT '规则类型，1为需要用户信息',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态：为0正常，为1禁用',
+  `is_show` tinyint(1) DEFAULT '0' COMMENT '是否显示:0显示，1不显示',
+  `is_public` tinyint(1) DEFAULT '0' COMMENT '是否是开放的权限，用于判断新增或更改都开放情况：0否，1是',
+  `condition` text NOT NULL COMMENT '规则表达式，为空表示存在就验证，不为空表示按照条件验证# 规则附件条件,满足附加条件的规则,才认为是有效的规则',
+  `pid` mediumint(8) unsigned NOT NULL COMMENT '用户把规则划分成组，方便分配权限',
+  `update_time` datetime DEFAULT NULL,
+  `create_time` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`) USING BTREE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='规则表';
 
 -- ----------------------------
 -- auth_group 用户组表
 -- ----------------------------
 DROP TABLE IF EXISTS `auth_group`;
 CREATE TABLE `auth_group` (
-`id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
-`title` varchar(255) NOT NULL DEFAULT '' COMMENT '用户组中文名称',
-`status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '状态：为1正常，为0禁用',
-`rules` text  DEFAULT '' COMMENT '用户组拥有的规则id，多个规则","隔开',
-`remarks` text  DEFAULT '' COMMENT '备注',
-PRIMARY KEY (`id`)
-) ENGINE=InnoDB  AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户组表';
+  `id` mediumint(8) unsigned NOT NULL AUTO_INCREMENT,
+  `oid` int(11) DEFAULT NULL,
+  `title` varchar(255) NOT NULL DEFAULT '' COMMENT '用户组中文名称',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态：为0正常，为1禁用',
+  `rules` text COMMENT '用户组拥有的规则id，多个规则","隔开',
+  `is_del` tinyint(1) DEFAULT '0' COMMENT '删除状态：0正常，1删除',
+  `update_time` datetime DEFAULT NULL,
+  `create_time` datetime DEFAULT NULL,
+  `remarks` text  DEFAULT '' COMMENT '备注',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户组表';
 
 -- ----------------------------
 -- auth_group_access 用户组明细表
@@ -71,8 +81,7 @@ UNIQUE KEY `uid_group_id` (`uid`,`group_id`),
 KEY `uid` (`uid`),
 KEY `group_id` (`group_id`)
 ) ENGINE=InnoDB  AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COMMENT='用户组明细表';
-
- */
+*/
 
 /**
  * 权限认证类
@@ -168,8 +177,11 @@ class Auth
             $name = strtolower($name);
             if (strpos($name, ',') !== false) {
                 $name = explode(',', $name);
+                array_walk($name,function(&$v){
+                  $v = strtolower($v . '_' . $_SERVER['REQUEST_METHOD']);
+                });
             } else {
-                $name = [$name];
+                $name = [strtolower($name . '_' . $_SERVER['REQUEST_METHOD'])];
             }
         }
 
@@ -191,7 +203,6 @@ class Auth
                     //如果节点相符且url参数满足
                     $list[] = $auth;
                 }
-
             } else {
                 if (in_array($auth, $name)) {
                     $list[] = $auth;
@@ -238,29 +249,27 @@ class Auth
         //循环判断规则，即获取所有符合条件的规则
         $authList = [];
         //把公共规则加上
-        if (strpos($this->config['public_auth'], ',') !== false) {
-            $this->config['public_auth'] = explode(',', $this->config['public_auth']);
-        } else {
-            $this->config['public_auth'] = [$this->config['public_auth']];
+        if(!empty($this->config['public_auth']) && is_array($this->config['public_auth'])){
+           array_walk($this->config['public_auth'], function (&$v) {
+              $v = strtolower($v['name'] . '_' .$v['method']);
+           });
         }
-        array_walk($this->config['public_auth'], function (&$v) {
-            $v = strtolower($v);
-        });
         $authList = $this->config['public_auth'];
 
         foreach ($rules as $rule) {
             //跳过权限 todo
+            //需要用户信息的规则验证
             if ($rule['type'] == 1 && !empty($rule['condition'])) {
                 //根据condition进行验证
                 $user    = $this->getUserInfo($uid); //获取用户信息,一维数组
                 $command = preg_replace('/\{(\w*?)\}/', '$user[\'\\1\']', $rule['condition']);
                 @(eval('$condition=(' . $command . ');'));
                 if ($condition) {
-                    $authList[] = strtolower($rule['name']);
+                    $authList[] = strtolower($rule['name']. '_' . $rule['request_method']);
                 }
             } else {
                 //只要存在就记录
-                $authList[] = strtolower($rule['name']);
+                $authList[] = strtolower($rule['name'] . '_' . $rule['request_method']);
             }
 
         }

@@ -46,7 +46,7 @@ class Custom extends Db
      */
     protected function getGroups($uid)
     {
-        $sql = "SELECT aga.uid,ag.title,ag.status,ag.rules FROM {$this->config['auth_group_access']} AS aga LEFT JOIN {$this->config['auth_group']} AS ag ON aga.group_id = ag.id  WHERE aga.uid = {$uid} AND ag.status= 1 ";
+        $sql = "SELECT aga.uid,ag.title,ag.status,ag.rules FROM {$this->config['auth_group_access']} AS aga LEFT JOIN {$this->config['auth_group']} AS ag ON aga.group_id = ag.id  WHERE aga.uid = {$uid} AND ag.status= 0 ";
 
         $stmt = $this->db->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -72,22 +72,33 @@ class Custom extends Db
      */
     public function getRules($uid)
     {
+
         //读取用户所属用户组即获取其所有的规则ID
         $groups = $this->getGroups($uid);
         $ids    = []; //保存用户所属用户组设置的所有权限规则id
         foreach ($groups as $g) {
             $ids = array_merge($ids, explode(',', trim($g['rules'], ',')));
         }
+    
         $ids = array_unique($ids);
         if (empty($ids)) {
             return [];
         }
 
         $ids = implode(',', $ids);
-        $sql = "SELECT `condition`,`name`,`type` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 1 ";
+        $sql = "SELECT `condition`,`name`,`type`,`request_method` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 0 ";
 
         $stmt = $this->db->query($sql);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $userRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+        //获取公开的规则，is_public：1
+        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method` FROM {$this->config['auth_rule']}  WHERE is_public=1 AND status= 0 ";
+        $stmt = $this->db->query($sql);
+        $publicRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        //合并
+        $ret = array_column(array_merge((array)$userRules,(array)$publicRules), null,'id');
+        return $ret;
     }
 
     /**
