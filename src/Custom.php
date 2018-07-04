@@ -79,25 +79,25 @@ class Custom extends Db
         foreach ($groups as $g) {
             $ids = array_merge($ids, explode(',', trim($g['rules'], ',')));
         }
-    
+
         $ids = array_unique($ids);
         if (empty($ids)) {
             return [];
         }
 
         $ids = implode(',', $ids);
-        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 0 ";
+        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid`,`is_public` FROM {$this->config['auth_rule']}  WHERE id in ($ids) AND status= 0 ";
 
-        $stmt = $this->db->query($sql);
+        $stmt      = $this->db->query($sql);
         $userRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
+
         //获取公开的规则，is_public：1
-        $sql = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid` FROM {$this->config['auth_rule']}  WHERE is_public=1 AND status= 0 ";
-        $stmt = $this->db->query($sql);
+        $sql         = "SELECT `id`,`condition`,`name`,`type`,`request_method`,`pid`,`is_public` FROM {$this->config['auth_rule']}  WHERE is_public=1 AND status= 0 ";
+        $stmt        = $this->db->query($sql);
         $publicRules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         //合并
-        $ret = array_column(array_merge((array)$userRules,(array)$publicRules), null,'id');
+        $ret = array_column(array_merge((array) $userRules, (array) $publicRules), null, 'id');
         return $ret;
     }
 
