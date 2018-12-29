@@ -77,7 +77,9 @@ class Custom extends Db
         $groups = $this->getGroups($uid);
         $ids    = []; //保存用户所属用户组设置的所有权限规则id
         foreach ($groups as $g) {
-            $ids = array_merge($ids, explode(',', trim($g['rules'], ',')));
+            if(!empty($g['rules'])){
+                $ids = array_merge($ids, explode(',', trim($g['rules'], ',')));
+            }
         }
 
         $ids = array_unique($ids);
