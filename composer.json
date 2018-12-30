@@ -1,10 +1,10 @@
 {
     "name": "sujun/auth",
-    "description": "auth package for thinkphp5",
+    "description": "适合于任何PHP后台系统",
     "homepage": "http://www.yikaipu.com",
     "license": "Apache-2.0",
     "minimum-stability": "stable",
-    "version": "v2.0.4",
+    "version": "v2.0.6",
     "authors": [
          {
             "name":"sujun",
